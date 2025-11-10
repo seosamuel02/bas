@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BASTION - Caldera-Wazuh Integration</title>
+    
+    <!-- Bulma CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+</head>
+<body class="has-background-black-ter">
+<div class="container is-fluid mt-5">
+<div id="bastionPage" x-data="alpineBastion()">
+    <div>
+        <div x-data="{showText: false}">
+            <h2 x-on:mouseover="showText = true" x-on:mouseleave="showText = false">
+                BASTION
+                <sub x-show="showText" class="is-size-7 pl-1">Caldera-Wazuh Integration</sub>
+            </h2>
+        </div>
+        <p>실시간 Wazuh SIEM 통합으로 공격 시뮬레이션 탐지 현황을 모니터링하고 상관관계를 분석합니다.</p>
+    </div>
+    <hr>
+
+    <!-- Health Status Section -->
+    <div class="section">
+        <div class="columns is-multiline">
+            <div class="column is-3">
+                <div class="box has-background-dark"
+                     x-bind:class="healthStatus.plugin === 'healthy' ? 'has-border-success' : 'has-border-danger'">
+                    <div class="media">
+                        <div class="media-left">
+                            <span class="icon is-large">
+                                <i class="fas fa-plug fa-2x"></i>
+                            </span>
+                        </div>
+                        <div class="media-content">
+                            <p class="title is-6 has-text-grey-light">BASTION 플러그인</p>
+                            <p class="subtitle is-5" x-text="healthStatus.plugin || 'Unknown'"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="column is-3">
+                <div class="box has-background-dark"
+                     x-bind:class="healthStatus.wazuh_manager === 'healthy' ? 'has-border-success' : 'has-border-danger'">
+                    <div class="media">
+                        <div class="media-left">
+                            <span class="icon is-large">
+                                <i class="fas fa-server fa-2x"></i>
+                            </span>
+                        </div>
+                        <div class="media-content">
+                            <p class="title is-6 has-text-grey-light">Wazuh Manager</p>
+                            <p class="subtitle is-5" x-text="formatHealthStatus(healthStatus.wazuh_manager)"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="column is-3">
+                <div class="box has-background-dark"
+                     x-bind:class="isIndexerHealthy(healthStatus.wazuh_indexer) ? 'has-border-success' : 'has-border-danger'">
+                    <div class="media">
+                        <div class="media-left">
+                            <span class="icon is-large">
+                                <i class="fas fa-database fa-2x"></i>
+                            </span>
+                        </div>
+                        <div class="media-content">
+                            <p class="title is-6 has-text-grey-light">Wazuh Indexer</p>
+                            <p class="subtitle is-5" x-text="formatHealthStatus(healthStatus.wazuh_indexer)"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="column is-3">
+                <div class="box has-background-dark"
+                     x-bind:class="healthStatus.authenticated ? 'has-border-success' : 'has-border-warning'">
+                    <div class="media">
+                        <div class="media-left">
+                            <span class="icon is-large">
+                                <i class="fas fa-lock fa-2x"></i>
+                            </span>
+                        </div>
+                        <div class="media-content">
+                            <p class="title is-6 has-text-grey-light">인증 상태</p>
+                            <p class="subtitle is-5" x-text="healthStatus.authenticated ? 'Authenticated' : 'Not Authenticated'"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Refresh Button -->
+        <div class="field">
+            <div class="control">
+                <button class="button is-primary is-small"
+                        x-on:click="refreshData()"
+                        x-bind:disabled="isLoading">
+                    <span class="icon is-small">
+                        <i x-bind:class="isLoading ? 'fas fa-spinner fa-pulse' : 'fas fa-sync-alt'"></i>
+                    </span>
+                    <span x-text="isLoading ? '로딩 중...' : '새로고침'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Statistics Section -->
+    <div class="section">
+        <div class="is-flex is-justify-content-space-between is-align-items-center mb-4">
+            <h3 class="title is-4">최근 알림 분석</h3>
+            <div class="field is-horizontal">
+                <div class="field-label is-small">
+                    <label class="label">조회 기간:</label>
+                </div>
+                <div class="field-body">
+                    <div class="field is-narrow">
+                        <div class="control">
+                            <div class="select is-small">
+                                <select x-model="queryHours" x-on:change="fetchAlerts()">
+                                    <option value="1">1시간</option>
+                                    <option value="6">6시간</option>
+                                    <option value="24" selected>24시간</option>
+                                    <option value="168">7일</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="field-label is-small ml-3">
+                    <label class="label">최소 레벨:</label>
+                </div>
+                <div class="field-body">
+                    <div class="field is-narrow">
+                        <div class="control">
+                            <div class="select is-small">
+                                <select x-model="minLevel" x-on:change="fetchAlerts()">
+                                    <option value="5">5 - Low</option>
+                                    <option value="7" selected>7 - Medium</option>
+                                    <option value="10">10 - High</option>
+                                    <option value="12">12 - Critical</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Summary -->
+        <div class="columns">
+            <div class="column">
+                <div class="notification is-dark">
+                    <p class="heading">총 알림</p>
+                    <p class="title" x-text="alertStats.total"></p>
+                </div>
+            </div>
+            <div class="column">
+                <div class="notification is-dark">
+                    <p class="heading">탐지된 기법</p>
+                    <p class="title" x-text="alertStats.detected_techniques.length"></p>
+                </div>
+            </div>
+            <div class="column">
+                <div class="notification is-dark">
+                    <p class="heading">마지막 업데이트</p>
+                    <p class="title is-6" x-text="formatTimestamp(alertStats.query_time)"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- MITRE Techniques -->
+        <template x-if="alertStats.detected_techniques.length > 0">
+            <div class="box has-background-dark">
+                <p class="title is-6 has-text-grey-light mb-3">탐지된 MITRE ATT&CK 기법</p>
+                <div class="tags">
+                    <template x-for="technique in alertStats.detected_techniques" :key="technique">
+                        <span class="tag is-warning is-light" x-text="technique"></span>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <!-- Alerts Table -->
+        <div class="box has-background-dark" style="overflow-x: auto;">
+            <p class="title is-6 has-text-grey-light mb-3">알림 목록</p>
+            <template x-if="alertStats.alerts.length === 0">
+                <div class="notification is-info is-light">
+                    <p>조회된 알림이 없습니다.</p>
+                </div>
+            </template>
+            <template x-if="alertStats.alerts.length > 0">
+                <table class="table is-fullwidth is-striped is-hoverable">
+                    <thead>
+                        <tr>
+                            <th>시간</th>
+                            <th>레벨</th>
+                            <th>규칙 ID</th>
+                            <th>설명</th>
+                            <th>에이전트</th>
+                            <th>MITRE 기법</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="(alert, index) in alertStats.alerts" :key="index">
+                            <tr>
+                                <td x-text="formatTimestamp(alert.timestamp)"></td>
+                                <td>
+                                    <span class="tag"
+                                          x-bind:class="'is-' + getLevelClass(alert.rule?.level)"
+                                          x-text="alert.rule?.level || 'N/A'">
+                                    </span>
+                                </td>
+                                <td x-text="alert.rule?.id || 'N/A'"></td>
+                                <td x-text="alert.rule?.description || 'N/A'"></td>
+                                <td x-text="alert.agent?.name || alert.agent?.id || 'N/A'"></td>
+                                <td>
+                                    <span x-show="alert.data?.mitre?.id"
+                                          class="tag is-warning is-light"
+                                          x-text="alert.data?.mitre?.id">
+                                    </span>
+                                    <span x-show="!alert.data?.mitre?.id">-</span>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </template>
+        </div>
+    </div>
+
+    <!-- Operation Correlation Section -->
+    <div class="section">
+        <h3 class="title is-4">작전 상관관계 분석</h3>
+        <div class="box has-background-dark">
+            <div class="field has-addons">
+                <div class="control is-expanded">
+                    <input class="input"
+                           type="text"
+                           x-model="correlationOperationId"
+                           placeholder="Caldera 작전 ID (예: 550e8400-e29b-41d4-a716-446655440000)">
+                </div>
+                <div class="control">
+                    <button class="button is-primary"
+                            x-on:click="correlateOperation()"
+                            x-bind:disabled="!correlationOperationId || isCorrelating">
+                        <span class="icon">
+                            <i x-bind:class="isCorrelating ? 'fas fa-spinner fa-pulse' : 'fas fa-search'"></i>
+                        </span>
+                        <span x-text="isCorrelating ? '분석 중...' : '상관관계 분석'"></span>
+                    </button>
+                </div>
+            </div>
+
+            <template x-if="correlationResult">
+                <div class="notification is-info is-light mt-4">
+                    <p class="title is-6">분석 결과</p>
+                    <div class="content">
+                        <p><strong>작전 이름:</strong> <span x-text="correlationResult.operation_name"></span></p>
+                        <p><strong>시작 시간:</strong> <span x-text="formatTimestamp(correlationResult.start_time)"></span></p>
+                        <p><strong>종료 시간:</strong> <span x-text="formatTimestamp(correlationResult.end_time)"></span></p>
+                        <p><strong>상관관계:</strong> <span x-text="correlationResult.correlation"></span></p>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Quick Actions Section -->
+    <div class="section">
+        <h3 class="title is-4">빠른 작업</h3>
+        <div class="buttons">
+            <button class="button is-info"
+                    x-on:click="generateDetectionReport()"
+                    x-bind:disabled="isGeneratingReport">
+                <span class="icon">
+                    <i x-bind:class="isGeneratingReport ? 'fas fa-spinner fa-pulse' : 'fas fa-file-alt'"></i>
+                </span>
+                <span>탐지 리포트 생성</span>
+            </button>
+            <button class="button is-warning"
+                    x-on:click="createAdaptiveOperation()"
+                    x-bind:disabled="isCreatingOperation">
+                <span class="icon">
+                    <i x-bind:class="isCreatingOperation ? 'fas fa-spinner fa-pulse' : 'fas fa-crosshairs'"></i>
+                </span>
+                <span>적응형 작전 생성</span>
+            </button>
+            <button class="button is-link"
+                    x-on:click="openWazuhDashboard()">
+                <span class="icon">
+                    <i class="fas fa-external-link-alt"></i>
+                </span>
+                <span>Wazuh Dashboard 열기</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Agent List Section -->
+    <div class="section">
+        <h3 class="title is-4">Agent 목록</h3>
+        <div class="box has-background-dark" style="overflow-x: auto;">
+            <div x-show="agentStats.agents && agentStats.agents.length === 0" class="notification is-info is-light">
+                <p>등록된 Agent가 없습니다.</p>
+            </div>
+            <div x-show="agentStats.agents && agentStats.agents.length > 0">
+                <table class="table is-fullwidth is-striped is-hoverable">
+                    <thead>
+                        <tr>
+                            <th>Agent</th>
+                            <th>Status</th>
+                            <th>Platform</th>
+                            <th>Caldera+Wazuh</th>
+                            <th>Detections</th>
+                            <th>Last Seen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="(agent, index) in agentStats.agents" :key="agent.paw">
+                            <tr>
+                                <td>
+                                    <div>
+                                        <strong x-text="agent.host"></strong>
+                                        <br>
+                                        <small class="has-text-grey-light" x-text="agent.username"></small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="tag" x-bind:class="agent.alive ? 'is-success' : 'is-danger'">
+                                        <span x-text="agent.alive ? '🟢 ALIVE' : '🔴 DEAD'"></span>
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="tag is-info is-light" x-text="agent.platform"></span>
+                                </td>
+                                <td>
+                                    <span class="tag" x-bind:class="agent.wazuh_matched ? 'is-success' : 'is-warning'">
+                                        <span x-text="agent.wazuh_matched ? '✓ Matched' : '✗ No Match'"></span>
+                                    </span>
+                                    <template x-if="agent.wazuh_agent">
+                                        <div class="mt-1">
+                                            <small class="has-text-grey-light">
+                                                Wazuh ID: <span x-text="agent.wazuh_agent.id"></span>
+                                                (<span x-text="agent.wazuh_agent.status"></span>)
+                                            </small>
+                                        </div>
+                                    </template>
+                                </td>
+                                <td>
+                                    <span class="tag is-warning" x-text="agent.recent_detections.length"></span>
+                                </td>
+                                <td x-text="formatTimestamp(agent.last_seen)"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </template>
+        </div>
+    </div>
+</div>
+
+<script>
+    function alpineBastion() {
+        return {
+            isLoading: false,
+            healthStatus: {
+                plugin: 'unknown',
+                wazuh_manager: 'unknown',
+                wazuh_indexer: 'unknown',
+                authenticated: false,
+                timestamp: null
+            },
+            queryHours: 24,
+            minLevel: 7,
+            alertStats: {
+                total: 0,
+                detected_techniques: [],
+                alerts: [],
+                query_time: null
+            },
+            correlationOperationId: '',
+            correlationResult: null,
+            isCorrelating: false,
+            isGeneratingReport: false,
+            isCreatingOperation: false,
+            agentStats: {
+                total_agents: 0,
+                agents: []
+            },
+
+            init() {
+                this.fetchHealthStatus();
+                this.fetchAlerts();
+                this.fetchAgents();
+                setInterval(() => {
+                    this.fetchHealthStatus();
+                    this.fetchAlerts();
+                    this.fetchAgents();
+                }, 30000);
+            },
+
+            async fetchHealthStatus() {
+                try {
+                    const response = await fetch('/plugin/bastion/health');
+                    const data = await response.json();
+                    this.healthStatus = data;
+                } catch (error) {
+                    console.error('Failed to fetch health status:', error);
+                }
+            },
+
+            async fetchAlerts() {
+                try {
+                    const response = await fetch(`/plugin/bastion/alerts?hours=${this.queryHours}&min_level=${this.minLevel}`);
+                    const data = await response.json();
+                    this.alertStats = data;
+                } catch (error) {
+                    console.error('Failed to fetch alerts:', error);
+                }
+            },
+
+            async fetchAgents() {
+                try {
+                    const response = await fetch('/plugin/bastion/agents?hours=24');
+                    const data = await response.json();
+                    if (data.success) {
+                        this.agentStats = data;
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch agents:', error);
+                }
+            },
+
+            async refreshData() {
+                this.isLoading = true;
+                try {
+                    await Promise.all([
+                        this.fetchHealthStatus(),
+                        this.fetchAlerts(),
+                        this.fetchAgents()
+                    ]);
+                    toast('데이터를 성공적으로 새로고침했습니다', true);
+                } catch (error) {
+                    toast('데이터 새로고침 실패', false);
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+
+            async correlateOperation() {
+                if (!this.correlationOperationId) return;
+
+                this.isCorrelating = true;
+                try {
+                    const response = await fetch('/plugin/bastion/correlate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ operation_id: this.correlationOperationId })
+                    });
+                    this.correlationResult = await response.json();
+                    toast('상관관계 분석 완료', true);
+                } catch (error) {
+                    toast('상관관계 분석 실패', false);
+                    console.error('Correlation failed:', error);
+                } finally {
+                    this.isCorrelating = false;
+                }
+            },
+
+            async generateDetectionReport() {
+                this.isGeneratingReport = true;
+                try {
+                    const response = await fetch('/plugin/bastion/report', { method: 'POST' });
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `detection-report-${Date.now()}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    toast('리포트 생성 완료', true);
+                } catch (error) {
+                    toast('리포트 생성 실패', false);
+                    console.error('Report generation failed:', error);
+                } finally {
+                    this.isGeneratingReport = false;
+                }
+            },
+
+            async createAdaptiveOperation() {
+                this.isCreatingOperation = true;
+                try {
+                    const response = await fetch('/plugin/bastion/adaptive-operation', { method: 'POST' });
+                    const data = await response.json();
+                    toast(`작전 생성 완료: ${data.operation_id}`, true);
+                } catch (error) {
+                    toast('작전 생성 실패', false);
+                    console.error('Operation creation failed:', error);
+                } finally {
+                    this.isCreatingOperation = false;
+                }
+            },
+
+            openWazuhDashboard() {
+                window.open('https://localhost:5601', '_blank');
+            },
+
+            formatHealthStatus(status) {
+                if (typeof status === 'string') {
+                    return status.charAt(0).toUpperCase() + status.slice(1);
+                }
+                return 'Unknown';
+            },
+
+            isIndexerHealthy(status) {
+                if (typeof status === 'string') {
+                    return status.toLowerCase() === 'green' || status.toLowerCase() === 'healthy';
+                }
+                return false;
+            },
+
+            formatTimestamp(timestamp) {
+                if (!timestamp) return 'N/A';
+                const date = new Date(timestamp);
+                return date.toLocaleString('ko-KR');
+            },
+
+            getLevelClass(level) {
+                if (level >= 12) return 'danger';
+                if (level >= 10) return 'warning';
+                if (level >= 7) return 'info';
+                return 'light';
+            },
+
+            toast(message, isSuccess = true) {
+                // 간단한 콘솔 로깅 (향후 실제 토스트 UI로 업그레이드 가능)
+                const prefix = isSuccess ? '✓' : '✗';
+                console.log(`${prefix} ${message}`);
+
+                // 선택사항: 브라우저 알림 API 사용
+                // if ('Notification' in window && Notification.permission === 'granted') {
+                //     new Notification('BASTION', { body: message });
+                // }
+            }
+        };
+    }
+</script>
+
+<style>
+    #bastionPage .box {
+        border-left: 4px solid transparent;
+    }
+
+    #bastionPage .has-border-success {
+        border-left-color: #48c774;
+    }
+
+    #bastionPage .has-border-danger {
+        border-left-color: #f14668;
+    }
+
+    #bastionPage .has-border-warning {
+        border-left-color: #ffe08a;
+    }
+
+    #bastionPage .section {
+        padding: 1.5rem 0;
+    }
+
+    #bastionPage .table {
+        background-color: transparent;
+        color: #f5f5f5;
+    }
+
+    #bastionPage .table th {
+        color: #b5b5b5;
+        border-color: #363636;
+    }
+
+    #bastionPage .table td {
+        border-color: #363636;
+    }
+
+    #bastionPage .table.is-striped tbody tr:nth-child(even) {
+        background-color: rgba(255, 255, 255, 0.02);
+    }
+
+    #bastionPage .notification.is-dark {
+        background-color: #272727;
+        color: #f5f5f5;
+    }
+
+    #bastionPage .heading {
+        color: #b5b5b5;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+</style>
+</div>
+</body>
+</html>

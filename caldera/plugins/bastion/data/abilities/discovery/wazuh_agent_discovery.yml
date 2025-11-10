@@ -1,0 +1,36 @@
+---
+
+- id: a1b2c3d4-5678-90ab-cdef-123456789abc
+  name: Get Wazuh Agent ID
+  description: Read Wazuh agent ID from client.keys file for BASTION correlation
+  tactic: discovery
+  technique:
+    attack_id: T1082
+    name: System Information Discovery
+  platforms:
+    linux:
+      sh:
+        command: cat /var/ossec/etc/client.keys 2>/dev/null | head -n 1 | awk '{print $1}' || echo "NONE"
+        parsers:
+          plugins.bastion.app.parsers.wazuh_agent_id:
+            - source: wazuh.agent.id
+    darwin:
+      sh:
+        command: cat /Library/Ossec/etc/client.keys 2>/dev/null | head -n 1 | awk '{print $1}' || echo "NONE"
+        parsers:
+          plugins.bastion.app.parsers.wazuh_agent_id:
+            - source: wazuh.agent.id
+    windows:
+      psh:
+        command: |
+          $clientKeysPath = "C:\Program Files (x86)\ossec-agent\client.keys"
+          if (Test-Path $clientKeysPath) {
+            $content = Get-Content $clientKeysPath -First 1
+            $agentId = $content.Split()[0]
+            Write-Output $agentId
+          } else {
+            Write-Output "NONE"
+          }
+        parsers:
+          plugins.bastion.app.parsers.wazuh_agent_id:
+            - source: wazuh.agent.id

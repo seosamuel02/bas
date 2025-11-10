@@ -1,0 +1,6 @@
+# CWIP (Caldera-Wazuh Integration Plugin) Dependencies
+# Caldera 기본 의존성은 이미 설치되어 있음 (aiohttp, pyyaml 등)
+
+# 추가 의존성 없음 - Caldera 코어 라이브러리만 사용
+# aiohttp는 Caldera에 포함됨
+# asyncio는 Python 표준 라이브러리

@@ -1,0 +1,29 @@
+# BASTION (Caldera-Wazuh Integration Plugin) 기본 설정
+
+bastion:
+  # Wazuh Manager API 설정
+  wazuh_manager_url: "https://localhost:55000"
+  wazuh_username: "wazuh"
+  wazuh_password: "wazuh"
+
+  # Wazuh Indexer (OpenSearch) 설정
+  wazuh_indexer_url: "https://localhost:9200"
+
+  # SSL 검증 (개발 환경에서는 false, 프로덕션에서는 true)
+  verify_ssl: false
+
+  # 알림 모니터링 간격 (초)
+  alert_query_interval: 300
+
+  # 지속적 모니터링 활성화 여부
+  enable_continuous_monitoring: false
+
+  # 탐지 분석 설정
+  detection:
+    min_alert_level: 7  # 최소 알림 심각도 (0-15)
+    correlation_window: 300  # 상관관계 분석 시간 윈도우 (초)
+
+  # 적응형 작전 설정
+  adaptive:
+    enabled: false
+    auto_adjust_ttps: false  # TTP 자동 조정 여부
