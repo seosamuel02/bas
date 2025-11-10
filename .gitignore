@@ -21,8 +21,8 @@ correlate_result.json
 agent_fqhasn.json
 
 # Docker 관련
-wazuh-docker/
-wazuh-custom-rules/
+# wazuh-docker/ - 서버 구축에 필요하므로 포함
+# wazuh-custom-rules/ - 서버 구축에 필요하므로 포함
 
 # Node modules
 **/node_modules/
