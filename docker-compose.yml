@@ -1,0 +1,154 @@
+# BASTION - Caldera-Wazuh Integration Platform
+# Unified Docker Compose for development
+
+version: '3.8'
+
+services:
+  # Wazuh Manager
+  wazuh.manager:
+    image: wazuh/wazuh-manager:4.9.2
+    hostname: wazuh.manager
+    restart: always
+    ports:
+      - "1514:1514"      # Agent communication
+      - "1515:1515"      # Agent enrollment
+      - "55000:55000"    # API
+    environment:
+      - INDEXER_URL=https://wazuh.indexer:9200
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=SecretPassword
+      - FILEBEAT_SSL_VERIFICATION_MODE=full
+      - SSL_CERTIFICATE_AUTHORITIES=/etc/ssl/root-ca.pem
+      - SSL_CERTIFICATE=/etc/ssl/filebeat.pem
+      - SSL_KEY=/etc/ssl/filebeat.key
+      - API_USERNAME=wazuh
+      - API_PASSWORD=MyS3cur3P@ssw0rd!
+    volumes:
+      - wazuh_api_configuration:/var/ossec/api/configuration
+      - wazuh_etc:/var/ossec/etc
+      - wazuh_logs:/var/ossec/logs
+      - wazuh_queue:/var/ossec/queue
+      - wazuh_var_multigroups:/var/ossec/var/multigroups
+      - wazuh_integrations:/var/ossec/integrations
+      - wazuh_active_response:/var/ossec/active-response/bin
+      - wazuh_agentless:/var/ossec/agentless
+      - wazuh_wodles:/var/ossec/wodles
+      - filebeat_etc:/etc/filebeat
+      - filebeat_var:/var/lib/filebeat
+      - ./wazuh-docker/single-node/config/wazuh_indexer_ssl_certs/root-ca-manager.pem:/etc/ssl/root-ca.pem
+      - ./wazuh-docker/single-node/config/wazuh_indexer_ssl_certs/wazuh.manager.pem:/etc/ssl/filebeat.pem
+      - ./wazuh-docker/single-node/config/wazuh_indexer_ssl_certs/wazuh.manager-key.pem:/etc/ssl/filebeat.key
+    networks:
+      - bastion-network
+
+  # Wazuh Indexer
+  wazuh.indexer:
+    image: wazuh/wazuh-indexer:4.9.2
+    hostname: wazuh.indexer
+    restart: always
+    ports:
+      - "9200:9200"      # Indexer API
+    environment:
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m -XX:MaxDirectMemorySize=536870912"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - wazuh-indexer-data:/var/lib/wazuh-indexer
+      - ./wazuh-docker/single-node/config/wazuh_indexer_ssl_certs/root-ca.pem:/usr/share/wazuh-indexer/certs/root-ca.pem
+      - ./wazuh-docker/single-node/config/wazuh_indexer_ssl_certs/wazuh.indexer-key.pem:/usr/share/wazuh-indexer/certs/wazuh.indexer.key
+      - ./wazuh-docker/single-node/config/wazuh_indexer_ssl_certs/wazuh.indexer.pem:/usr/share/wazuh-indexer/certs/wazuh.indexer.pem
+      - ./wazuh-docker/single-node/config/wazuh_indexer_ssl_certs/admin.pem:/usr/share/wazuh-indexer/certs/admin.pem
+      - ./wazuh-docker/single-node/config/wazuh_indexer_ssl_certs/admin-key.pem:/usr/share/wazuh-indexer/certs/admin-key.pem
+      - ./wazuh-docker/single-node/config/wazuh_indexer/wazuh.indexer.yml:/usr/share/wazuh-indexer/opensearch.yml
+      - ./wazuh-docker/single-node/config/wazuh_indexer/internal_users.yml:/usr/share/wazuh-indexer/opensearch-security/internal_users.yml
+    networks:
+      - bastion-network
+
+  # Wazuh Dashboard
+  wazuh.dashboard:
+    image: wazuh/wazuh-dashboard:4.9.2
+    hostname: wazuh.dashboard
+    restart: always
+    ports:
+      - "5601:5601"      # Dashboard HTTPS (포트 충돌 해결)
+    environment:
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=SecretPassword
+      - WAZUH_API_URL=https://wazuh.manager
+      - API_USERNAME=wazuh
+      - API_PASSWORD=MyS3cur3P@ssw0rd!
+    depends_on:
+      - wazuh.indexer
+    volumes:
+      - wazuh-dashboard-config:/usr/share/wazuh-dashboard/data/wazuh/config
+      - wazuh-dashboard-custom:/usr/share/wazuh-dashboard/plugins/wazuh/public/assets/custom
+      - ./wazuh-docker/single-node/config/wazuh_indexer_ssl_certs/wazuh.dashboard.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard.pem
+      - ./wazuh-docker/single-node/config/wazuh_indexer_ssl_certs/wazuh.dashboard-key.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard-key.pem
+      - ./wazuh-docker/single-node/config/wazuh_indexer_ssl_certs/root-ca.pem:/usr/share/wazuh-dashboard/certs/root-ca.pem
+      - ./wazuh-docker/single-node/config/wazuh_dashboard/opensearch_dashboards.yml:/usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
+      - ./wazuh-docker/single-node/config/wazuh_dashboard/wazuh.yml:/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml
+    networks:
+      - bastion-network
+
+  # Caldera 5.3.0 with BASTION Plugin
+  caldera:
+    image: caldera:5.3-bastion
+    hostname: caldera
+    restart: always
+    ports:
+      - "8888:8888"      # Web interface
+      - "8443:8443"      # HTTPS interface
+      - "7010:7010"      # TCP contact
+      - "7011:7011/udp"  # UDP contact
+      - "7012:7012"      # WebSocket
+      - "8853:8853"      # DNS tunneling
+      - "8022:8022"      # SSH tunneling
+      - "2222:2222"      # FTP C2
+    environment:
+      - WAZUH_MANAGER_URL=https://wazuh.manager:55000
+      - WAZUH_INDEXER_URL=https://wazuh.indexer:9200
+      - WAZUH_USERNAME=wazuh
+      - WAZUH_PASSWORD=MyS3cur3P@ssw0rd!
+      - WAZUH_INDEXER_USERNAME=admin
+      - WAZUH_INDEXER_PASSWORD=SecretPassword
+    volumes:
+      # BASTION plugin configuration
+      - ./caldera/conf/local.yml:/usr/src/app/conf/local.yml
+      # BASTION plugin source code (for hot-reload development)
+      - ./caldera/plugins/bastion:/usr/src/app/plugins/bastion
+      # Magma built frontend (for development with pre-built assets)
+      - ./caldera/plugins/magma/dist:/usr/src/app/plugins/magma/dist
+      # Persist Caldera data
+      - caldera_data:/usr/src/app/data
+    depends_on:
+      - wazuh.manager
+      - wazuh.indexer
+    command: ["--insecure"]
+    networks:
+      - bastion-network
+
+volumes:
+  wazuh_api_configuration:
+  wazuh_etc:
+  wazuh_logs:
+  wazuh_queue:
+  wazuh_var_multigroups:
+  wazuh_integrations:
+  wazuh_active_response:
+  wazuh_agentless:
+  wazuh_wodles:
+  filebeat_etc:
+  filebeat_var:
+  wazuh-indexer-data:
+  wazuh-dashboard-config:
+  wazuh-dashboard-custom:
+  caldera_data:
+
+networks:
+  bastion-network:
+    driver: bridge

@@ -1,0 +1,49 @@
+# 프로젝트 문서 (내부용)
+CLAUDE.md
+PROJECT_STATUS.md
+DASHBOARD_DESIGN.md
+WBS_BASTION.xlsx
+*.xlsx
+
+# 설정 파일
+wazuh_agent.conf
+mainsever.pem
+*.pem
+
+# Claude 관련
+.claude/
+.playwright-mcp/
+.mcp.json
+
+# 임시 파일
+nul
+correlate_result.json
+agent_fqhasn.json
+
+# Docker 관련
+wazuh-docker/
+wazuh-custom-rules/
+
+# Node modules
+**/node_modules/
+caldera/plugins/magma/dist/
+caldera/plugins/magma/.cache/
+caldera/plugins/magma/node_modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+**/__pycache__/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
