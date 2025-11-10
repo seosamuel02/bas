@@ -1,0 +1,50 @@
+# BASTION - Caldera-Wazuh Integration Plugin Configuration
+# 기본 설정은 default.yml을 따르고, BASTION 플러그인을 추가로 활성화
+
+# API 키 설정
+api_key_blue: BLUEADMIN123
+api_key_red: REDADMIN123
+
+# 플러그인 목록 (BASTION 추가)
+plugins:
+  - sandcat      # C2 에이전트
+  - stockpile    # 기본 능력 집합
+  - bastion      # Caldera-Wazuh Integration Plugin
+
+# 사용자 계정
+users:
+  red:
+    red: redpassword
+  blue:
+    blue: bluepassword
+
+# Wazuh 연동 설정 (환경 변수로도 설정 가능)
+# 이 값들은 docker-compose.yml의 환경 변수가 우선됩니다
+bastion:
+  wazuh:
+    manager_url: https://wazuh.manager:55000
+    indexer_url: https://wazuh.indexer:9200
+    manager_username: wazuh
+    manager_password: wazuh
+    indexer_username: admin
+    indexer_password: SecretPassword
+    verify_ssl: false
+
+  # 상관관계 엔진 설정
+  correlation:
+    enabled: true
+    time_window_seconds: 300
+    min_confidence_score: 0.7
+
+  # 대시보드 업데이트 간격 (초)
+  refresh_interval: 5
+
+  # 로깅 레벨
+  log_level: INFO
+
+# 서버 설정
+host: 0.0.0.0
+port: 8888
+
+# 기본 planner
+objects.planners.default: atomic
