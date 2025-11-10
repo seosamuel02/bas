@@ -1,0 +1,7 @@
+hosts:
+  - 1513629884013:
+      url: "https://wazuh.manager"
+      port: 55000
+      username: wazuh
+      password: "MyS3cur3P@ssw0rd!"
+      run_as: false
