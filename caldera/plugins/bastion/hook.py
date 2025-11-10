@@ -81,10 +81,10 @@ async def enable(services):
         app.router.add_route('GET', '/plugin/bastion/dashboard/techniques',
                             bastion_svc.get_technique_coverage)
 
-        # 정적 파일 제공 (CSS, JS, 이미지)
-        app.router.add_static('/bastion/static',
-                             'plugins/bastion/static/',
-                             append_version=True)
+        # 정적 파일 제공 (CSS, JS, 이미지) - 현재 미사용
+        # app.router.add_static('/bastion/static',
+        #                      'plugins/bastion/static/',
+        #                      append_version=True)
 
         log.info('[BASTION] REST API 엔드포인트 등록 완료')
         log.info('[BASTION] 사용 가능한 엔드포인트:')

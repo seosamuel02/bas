@@ -123,8 +123,6 @@ services:
       - ./caldera/conf/payloads.yml:/usr/src/app/conf/payloads.yml
       # BASTION plugin source code (for hot-reload development)
       - ./caldera/plugins/bastion:/usr/src/app/plugins/bastion
-      # Magma built frontend (for development with pre-built assets)
-      - ./caldera/plugins/magma/dist:/usr/src/app/plugins/magma/dist
       # Persist Caldera data
       - caldera_data:/usr/src/app/data
     depends_on:
